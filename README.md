@@ -12,4 +12,23 @@
 - **Offline-First Design:** Works without an internet connection, ensuring privacy and accessibility.  
 - **Extensible Architecture:** Supports future integration of AI features like spending predictions and recommendations.
 
+### UML Diagram
+```mermaid
+graph TD
+    User((User))
+    UC1[Record Transaction]
+    UC2[Edit/Delete Transaction]
+    UC3[View & Filter Transactions]
+    UC4[Set Monthly Budget]
+    UC5[View Summary Report]
+    UC6[Receive Overspending Alert]
+
+    User --> UC1
+    User --> UC2
+    User --> UC3
+    User --> UC4
+    User --> UC5
+    User --> UC6
+```
+
 ---
