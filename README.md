@@ -30,5 +30,6 @@ graph TD
     User --> UC5
     User --> UC6
 ```
-
+## Figma Prototype
+- [Prototype Link](https://dandy-wages-80515360.figma.site/)
 ---
