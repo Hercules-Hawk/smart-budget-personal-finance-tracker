@@ -1,5 +1,6 @@
 package ca.yorku.smartbudget.util;
 
+import ca.yorku.smartbudget.domain.Budget;
 import ca.yorku.smartbudget.domain.Transaction;
 
 import java.math.BigDecimal;
@@ -57,6 +58,28 @@ public class Validator {
         }
     }
 
+    public static void validateBudget(Budget budget) {
+        Map<String, String> errors = new LinkedHashMap<>();
+        if (budget == null) {
+            errors.put("budget", "Budget is required.");
+            throw new ValidationException(errors);
+        }
+        if (budget.getCategory() == null) {
+            errors.put("category", "Category is required.");
+        }
+        if (budget.getMonth() == null) {
+            errors.put("month", "Month is required.");
+        }
+        if (budget.getLimit() == null) {
+            errors.put("limit", "Limit is required.");
+        } else if (budget.getLimit().compareTo(BigDecimal.ZERO) <= 0) {
+            errors.put("limit", "Limit must be greater than 0.");
+        }
+        if (!errors.isEmpty()) {
+            throw new ValidationException(errors);
+        }
+    }
+
     // Helper methods
     public static void requireNotBlank(String value, String fieldName) {
         if (value == null || value.trim().isEmpty()) {
@@ -76,6 +99,16 @@ public class Validator {
     public static void requireDate(LocalDate date, String fieldName) {
         if (date == null) {
             throw new IllegalArgumentException(fieldName + " is required.");
+        }
+    }
+
+    /** Parses a decimal string (e.g. from amount/limit fields). Returns null if invalid. */
+    public static BigDecimal parseDecimal(String s) {
+        if (s == null || s.trim().isEmpty()) return null;
+        try {
+            return new BigDecimal(s.trim().replace(",", ""));
+        } catch (NumberFormatException e) {
+            return null;
         }
     }
 }
