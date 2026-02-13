@@ -15,6 +15,7 @@ import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.PieChart;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.ToggleButton;
@@ -41,7 +42,12 @@ final class ReportsController {
     private Label incomeValueLabel;
     private Label expenseValueLabel;
     private Label balanceValueLabel;
+    private Label incomeSubLabel;
+    private Label expenseSubLabel;
     private ComboBox<String> periodCombo;
+    private VBox customRangeFields;
+    private javafx.scene.control.DatePicker startDatePicker;
+    private javafx.scene.control.DatePicker endDatePicker;
     private StackPane chartArea;
     private ToggleButton pieBtn;
     private ToggleButton barBtn;
@@ -69,10 +75,36 @@ final class ReportsController {
         periodLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #374151;");
         periodCombo = new ComboBox<>();
         periodCombo.getItems().addAll("All Time", "This Month", "Custom Range");
-        periodCombo.setValue("All Time");
+        periodCombo.setValue("This Month");
         periodCombo.setMaxWidth(220);
-        periodCombo.valueProperty().addListener((o, oldVal, newVal) -> refresh());
-        VBox periodSection = new VBox(8, periodLabel, periodCombo);
+
+        // Create custom range date pickers
+        Label startDateLabel = new Label("Start Date");
+        startDateLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 12px; -fx-text-fill: #374151;");
+        startDatePicker = new DatePicker();
+        startDatePicker.setMaxWidth(220);
+        startDatePicker.setPromptText("Select start date");
+        startDatePicker.valueProperty().addListener((o, oldVal, newVal) -> refresh());
+
+        Label endDateLabel = new Label("End Date");
+        endDateLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 12px; -fx-text-fill: #374151;");
+        endDatePicker = new DatePicker();
+        endDatePicker.setMaxWidth(220);
+        endDatePicker.setPromptText("Select end date");
+        endDatePicker.valueProperty().addListener((o, oldVal, newVal) -> refresh());
+
+        customRangeFields = new VBox(8, startDateLabel, startDatePicker, endDateLabel, endDatePicker);
+        customRangeFields.setVisible(false);
+        customRangeFields.setManaged(false);
+
+        periodCombo.valueProperty().addListener((o, oldVal, newVal) -> {
+            boolean isCustomRange = "Custom Range".equals(newVal);
+            customRangeFields.setVisible(isCustomRange);
+            customRangeFields.setManaged(isCustomRange);
+            refresh();
+        });
+
+        VBox periodSection = new VBox(8, periodLabel, periodCombo, customRangeFields);
         periodSection.setPadding(new Insets(20, 24, 20, 24));
         periodSection.setStyle(CARD_STYLE);
 
@@ -82,9 +114,9 @@ final class ReportsController {
         Label incomeLabel = new Label("Total Income");
         incomeLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: " + SUBTITLE_GREY + ";");
         incomeValueLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: " + INCOME_GREEN + ";");
-        Label incomeSub = new Label("All Time");
-        incomeSub.setStyle("-fx-font-size: 11px; -fx-text-fill: " + SUBTITLE_GREY + ";");
-        VBox incomeCard = new VBox(10, incomeLabel, incomeValueLabel, incomeSub);
+        incomeSubLabel = new Label("This Month");
+        incomeSubLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: " + SUBTITLE_GREY + ";");
+        VBox incomeCard = new VBox(10, incomeLabel, incomeValueLabel, incomeSubLabel);
         incomeCard.setPadding(new Insets(24));
         incomeCard.setStyle(CARD_STYLE);
         incomeCard.setPrefWidth(200);
@@ -94,9 +126,9 @@ final class ReportsController {
         Label expenseLabel = new Label("Total Expenses");
         expenseLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: " + SUBTITLE_GREY + ";");
         expenseValueLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: " + EXPENSE_RED + ";");
-        Label expenseSub = new Label("All Time");
-        expenseSub.setStyle("-fx-font-size: 11px; -fx-text-fill: " + SUBTITLE_GREY + ";");
-        VBox expenseCard = new VBox(10, expenseLabel, expenseValueLabel, expenseSub);
+        expenseSubLabel = new Label("This Month");
+        expenseSubLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: " + SUBTITLE_GREY + ";");
+        VBox expenseCard = new VBox(10, expenseLabel, expenseValueLabel, expenseSubLabel);
         expenseCard.setPadding(new Insets(24));
         expenseCard.setStyle(CARD_STYLE);
         expenseCard.setPrefWidth(200);
@@ -183,6 +215,11 @@ final class ReportsController {
         expenseValueLabel.setText("$" + summary.getTotalExpense().setScale(2, RoundingMode.HALF_UP).toPlainString());
         balanceValueLabel.setText("$" + summary.getBalance().setScale(2, RoundingMode.HALF_UP).toPlainString());
 
+        // Update period labels dynamically based on selection
+        String periodText = getPeriodLabelText();
+        incomeSubLabel.setText(periodText);
+        expenseSubLabel.setText(periodText);
+
         List<CategoryTotal> breakdown = result.getBreakdown();
         chartArea.getChildren().clear();
         if (!result.isHasData() || breakdown.isEmpty()) {
@@ -222,10 +259,35 @@ final class ReportsController {
     }
 
     private PeriodRange currentRange() {
-        String period = periodCombo != null ? periodCombo.getValue() : "All Time";
+        String period = periodCombo != null ? periodCombo.getValue() : "This Month";
         if ("This Month".equals(period)) {
             return PeriodRange.ofMonth(YearMonth.now());
+        } else if ("Custom Range".equals(period)) {
+            java.time.LocalDate start = startDatePicker != null ? startDatePicker.getValue() : null;
+            java.time.LocalDate end = endDatePicker != null ? endDatePicker.getValue() : null;
+            if (start != null && end != null) {
+                return new PeriodRange(start, end);
+            }
+            // If dates not selected, return all time
+            return PeriodRange.allTime();
         }
         return PeriodRange.allTime();
+    }
+
+    private String getPeriodLabelText() {
+        String period = periodCombo != null ? periodCombo.getValue() : "This Month";
+        if ("All Time".equals(period)) {
+            return "All Time";
+        } else if ("This Month".equals(period)) {
+            return "This Month";
+        } else if ("Custom Range".equals(period)) {
+            java.time.LocalDate start = startDatePicker != null ? startDatePicker.getValue() : null;
+            java.time.LocalDate end = endDatePicker != null ? endDatePicker.getValue() : null;
+            if (start != null && end != null) {
+                return start.toString() + " to " + end.toString();
+            }
+            return "Custom Range";
+        }
+        return "This Month";
     }
 }
