@@ -8,6 +8,7 @@ import ca.yorku.smartbudget.domain.TransactionType;
 import ca.yorku.smartbudget.service.AlertService;
 import ca.yorku.smartbudget.service.TransactionService;
 import ca.yorku.smartbudget.ui.modals.AddTransactionModal;
+import ca.yorku.smartbudget.ui.modals.DeleteConfirmationModal;
 import ca.yorku.smartbudget.ui.modals.EditTransactionModal;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.scene.control.Alert;
@@ -230,8 +231,15 @@ public final class TransactionsController {
                 } else {
                     editBtn.setOnAction(ev -> EditTransactionModal.show(owner, tx, controllerRef));
                     delBtn.setOnAction(ev -> {
-                        transactionService.delete(tx.getId());
-                        controllerRef.refresh();
+                        String description = String.format("%s - %s - $%s",
+                            tx.getDate() != null ? tx.getDate().toString() : "",
+                            tx.getCategory() != null ? tx.getCategory().getDisplayName() : "",
+                            tx.getAmount() != null ? tx.getAmount().toPlainString() : "0.00"
+                        );
+                        DeleteConfirmationModal.show(owner, "Transaction", description, () -> {
+                            transactionService.delete(tx.getId());
+                            controllerRef.refresh();
+                        });
                     });
                     setGraphic(new HBox(8, editBtn, delBtn));
                 }

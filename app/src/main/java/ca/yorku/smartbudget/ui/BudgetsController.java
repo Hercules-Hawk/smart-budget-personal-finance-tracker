@@ -7,6 +7,7 @@ import ca.yorku.smartbudget.service.AlertService;
 import ca.yorku.smartbudget.service.BudgetService;
 import ca.yorku.smartbudget.service.TransactionService;
 import ca.yorku.smartbudget.ui.modals.AddBudgetModal;
+import ca.yorku.smartbudget.ui.modals.DeleteConfirmationModal;
 import ca.yorku.smartbudget.ui.modals.EditBudgetModal;
 import javafx.scene.control.Alert;
 import javafx.geometry.Insets;
@@ -151,8 +152,15 @@ public final class BudgetsController {
         Button delBtn = new Button("Delete");
         delBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + EXPENSE_RED + "; -fx-cursor: hand;");
         delBtn.setOnAction(e -> {
-            budgetService.deleteBudget(budget.getCategory(), budget.getMonth());
-            refresh();
+            String description = String.format("%s - %s - Limit: $%s",
+                budget.getCategory().getDisplayName(),
+                budget.getMonth() != null ? budget.getMonth().toString() : "",
+                budget.getLimit() != null ? budget.getLimit().toPlainString() : "0.00"
+            );
+            DeleteConfirmationModal.show(owner, "Budget", description, () -> {
+                budgetService.deleteBudget(budget.getCategory(), budget.getMonth());
+                refresh();
+            });
         });
 
         HBox cardHeader = new HBox();
