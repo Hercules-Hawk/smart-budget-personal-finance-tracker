@@ -74,7 +74,7 @@ final class ReportsController {
         Label periodLabel = new Label("Period Type");
         periodLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #374151;");
         periodCombo = new ComboBox<>();
-        periodCombo.getItems().addAll("All Time", "This Month", "Custom Range");
+        periodCombo.getItems().addAll("This Month", "All Time", "Custom Range");
         periodCombo.setValue("This Month");
         periodCombo.setMaxWidth(220);
 
