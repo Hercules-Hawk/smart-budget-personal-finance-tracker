@@ -1,0 +1,45 @@
+@startuml
+title UC-1 Record Transaction (Add Expense/Income)
+
+actor User
+participant TransactionsController as TC
+participant TransactionService as TS
+participant Validator as V
+participant Storage as ST
+participant AlertService as AS
+
+User -> TC : onAddTransaction()
+TC -> TC : collect form inputs
+TC -> TS : add(txDraft)
+
+TS -> V : validateTransaction(txDraft)
+alt invalid input
+  V --> TS : throws ValidationException
+  TS --> TC : error(message)
+  TC --> User : show validation message
+else valid input
+  V --> TS : ok
+
+  TS -> TS : create Transaction (id, fields)
+  TS -> ST : loadTransactions()
+  ST --> TS : txList
+
+  TS -> TS : add to cache/list
+  TS -> ST : saveTransactions(updatedList)
+  ST --> TS : success
+
+  TS --> TC : createdTx
+
+  ' Optional: check overspending after expense add
+  TC -> AS : checkOverspendingFor(createdTx)
+  AS --> TC : Optional<OverspendingAlert>
+
+  alt alert returned
+    TC --> User : show overspending alert
+  else no alert
+  end
+
+  TC -> TC : refreshTable()
+  TC --> User : show success + updated totals
+end
+@enduml

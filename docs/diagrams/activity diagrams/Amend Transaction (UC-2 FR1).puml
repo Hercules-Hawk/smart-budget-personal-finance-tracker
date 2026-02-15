@@ -1,0 +1,125 @@
+@startuml
+title UC-2 Amend Transaction (Edit/Delete) - Activity Diagram (FR1)
+
+skinparam style strictuml
+skinparam shadowing false
+skinparam activity {
+  BackgroundColor white
+  BorderColor black
+  ArrowColor black
+}
+skinparam linetype ortho
+
+start
+
+partition "User" {
+  :View transactions list/table;
+  :Click Edit (pencil) OR Delete (trash)\nnext to a transaction;
+}
+
+partition "TransactionsController (UI)" {
+  :Identify selected transactionId;
+  :Call TransactionService.getById(id);
+}
+
+partition "TransactionService" {
+  :Lookup transaction in cache/storage;
+}
+
+if (Transaction found?) then (yes)
+
+  partition "TransactionsController (UI)" {
+
+    if (Which button clicked?) then (Edit)
+
+      :Open "Edit Transaction" modal/lightbox\n(pre-populated fields);
+
+      partition "User" {
+        if (Close modal without saving?) then (X / Cancel)
+          :Click "X" or "Cancel";
+          stop
+        else (Continue)
+          :Modify fields\n(Type, Amount, Category, Date, Description);
+          :Click "Update Transaction";
+        endif
+      }
+
+      repeat
+        :Build updated Transaction\n(same id, updated values);
+        :Call TransactionService.update(updatedTx);
+
+        partition "TransactionService" {
+          :Validate updatedTx\n(via Validator);
+        }
+
+        partition "Validator" {
+          :validateTransaction(updatedTx);
+        }
+
+        if (Validation fails?) then (yes)
+          :Show inline validation errors\ninside edit modal;
+          partition "User" {
+            :Fix inputs;
+            :Click "Update Transaction" again;
+          }
+        endif
+
+      repeat while (Validation fails?) is (yes)
+
+      partition "TransactionService" {
+        :Update transaction in cache;
+        :Persist transactions;
+      }
+
+      partition "Storage" {
+        :saveTransactions(cache);
+      }
+
+      :Close edit modal;
+      :Refresh transactions list/table;
+      :Show update success feedback (optional);
+
+    else (Delete)
+
+      :Open "Delete Transaction" confirmation dialog;
+
+      partition "User" {
+        if (Proceed with deletion?) then (Delete)
+          :Click "Delete";
+        else (Cancel)
+          :Click "Cancel";
+        endif
+      }
+
+      if (Proceed with deletion?) then (Delete)
+        :Call TransactionService.delete(id);
+
+        partition "TransactionService" {
+          :Remove transaction from cache;
+          :Persist transactions;
+        }
+
+        partition "Storage" {
+          :saveTransactions(cache);
+        }
+
+        :Close confirmation dialog;
+        :Refresh transactions list/table;
+        :Show deletion feedback (optional);
+
+      else (Cancel)
+        :Close confirmation dialog\n(no changes);
+      endif
+
+    endif
+  }
+
+else (no)
+  partition "TransactionsController (UI)" {
+    :Show "Transaction not found" message;
+    :Refresh list (optional);
+  }
+endif
+
+stop
+@enduml

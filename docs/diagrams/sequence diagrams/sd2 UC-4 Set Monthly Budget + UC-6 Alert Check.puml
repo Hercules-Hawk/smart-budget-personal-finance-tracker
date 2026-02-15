@@ -1,0 +1,74 @@
+@startuml
+title UC-4 Set Monthly Budget + UC-6 Overspending Alert - SD-2
+
+actor User
+participant "BudgetsController" as BC
+participant "BudgetService" as BS
+participant "Validator" as V
+participant "Storage" as ST
+participant "AlertService" as AS
+participant "TransactionService" as TS
+
+== UC-4: User sets or updates a monthly budget ==
+User -> BC : onUpsertBudget(category, limit)
+activate BC
+
+' Controller decides which month this budget applies to (typically current month)
+BC -> BC : month = YearMonth.now()
+BC -> BC : budget = new Budget(category, month, limit)
+
+BC -> BS : upsertBudget(budget)
+activate BS
+
+' BudgetService validates inputs using Validator (per Diagram B)
+BS -> V : validateBudget(budget)
+
+alt Invalid budget (e.g., limit <= 0)
+  V --> BS : throws ValidationException
+  deactivate BS
+  BS --> BC : (exception propagated)
+  BC -> BC : show validation error message
+  BC --> User : display error
+else Valid budget
+  V --> BS : ok
+
+  ' Update service state: cache contains List<Budget>
+  BS -> BS : cache upsert (category, month)
+
+  ' Persist the updated cache to Storage
+  BS -> BS : persist()
+  BS -> ST : saveBudgets(cache)
+  ST --> BS : void
+
+  BS --> BC : savedBudget
+  deactivate BS
+
+  == UC-6: Check overspending status right after saving ==
+  BC -> BC : showAlertIfNeeded(category)
+
+  BC -> AS : checkBudgetStatus(category, month)
+  activate AS
+
+  ' AlertService reads the saved budget and the current spending
+  AS -> BS : getBudget(category, month)
+  BS --> AS : Budget
+
+  AS -> TS : getExpensesForCategoryAndMonth(category, month)
+  TS --> AS : spentAmount
+
+  AS -> AS : if spentAmount == limit -> REACHED\nelse if spentAmount > limit -> EXCEEDED\nelse OK
+  AS -> AS : create OverspendingAlert
+  AS --> BC : Optional<OverspendingAlert>
+  deactivate AS
+
+  alt alert returned (REACHED or EXCEEDED)
+    BC --> User : show overspending alert (status, overBy)
+  else status == OK
+    BC --> User : show budget saved + remaining amount
+  end
+
+  BC -> BC : refreshBudgetsView()
+end
+
+deactivate BC
+@enduml

@@ -1,0 +1,151 @@
+@startuml
+title UC-4 Set Monthly Budget (Edit/Delete Budget) - Activity Diagram (FR3) [Version B]
+
+skinparam style strictuml
+skinparam shadowing false
+skinparam activity {
+  BackgroundColor white
+  BorderColor black
+  ArrowColor black
+}
+skinparam linetype ortho
+
+start
+
+partition "User" {
+  :View budget cards on Budgets page;
+  :Click Edit OR Delete icon\non a budget card;
+}
+
+partition "BudgetsController (UI)" {
+  :Set month = YearMonth.now();
+  :Identify selected category;
+  :Call BudgetService.getBudget(category, month);
+}
+
+partition "BudgetService" {
+  :Lookup budget in cache/storage;
+}
+
+if (Budget found?) then (yes)
+
+  partition "BudgetsController (UI)" {
+
+    if (Which icon clicked?) then (Edit)
+
+      :Open "Edit Budget" modal\n(pre-populated values);
+      :Display Category (read-only)\n"Category cannot be changed after creation";
+      :Display Monthly Limit (editable);
+
+      partition "User" {
+        if (Close modal without saving?) then (X / Cancel)
+          :Click "X" or "Cancel";
+          stop
+        else (Continue)
+          :Update Monthly Limit;
+          :Click "Update Budget";
+        endif
+      }
+
+      repeat
+        :Build updated Budget\n(same category,\nmonth,\nnew monthlyLimit);
+        :Call BudgetService.upsertBudget(updatedBudget);
+
+        partition "BudgetService" {
+          :Validate updatedBudget\n(via Validator);
+        }
+
+        partition "Validator" {
+          :validateBudget(updatedBudget)\n(limit > 0, numeric);
+        }
+
+        if (Validation fails?) then (yes)
+          :Show inline validation errors\ninside edit modal;
+          partition "User" {
+            :Fix limit value;
+            :Click "Update Budget" again;
+          }
+        endif
+
+      repeat while (Validation fails?) is (yes)
+
+      partition "BudgetService" {
+        :Save/Update budget in cache;
+        :Persist budgets;
+      }
+
+      partition "Storage" {
+        :saveBudgets(cache);
+      }
+
+      ' UC-6 embedded: overspending re-check after update
+      partition "BudgetsController (UI)" {
+        :Call AlertService.checkBudgetStatus(updatedBudget.category, month);
+      }
+
+      partition "AlertService" {
+        :Get current month spending\nfor budget.category;
+        if (Spending >= monthlyLimit?) then (yes)
+          :Prepare overspending warning details;
+        else (no)
+          :No warning needed;
+        endif
+      }
+
+      partition "BudgetsController (UI)" {
+        :Close edit modal;
+        :Refresh budget cards\n(spent, limit, progress);
+        if (Spending >= monthlyLimit?) then (yes)
+          :Display warning on card\n(e.g., "exceeded by $X");
+        endif
+        :Show update feedback (optional);
+      }
+
+    else (Delete)
+
+      :Open "Delete Budget" confirmation dialog;
+
+      partition "User" {
+        if (Proceed with deletion?) then (Delete)
+          :Click "Delete";
+        else (Cancel)
+          :Click "Cancel";
+        endif
+      }
+
+      if (Proceed with deletion?) then (Delete)
+        :Call BudgetService.deleteBudget(category, month);
+
+        partition "BudgetService" {
+          :Remove budget from cache;
+          :Persist budgets;
+        }
+
+        partition "Storage" {
+          :saveBudgets(cache);
+        }
+
+        partition "BudgetsController (UI)" {
+          :Close confirmation dialog;
+          :Refresh budget cards/list;
+          :Show deletion feedback (optional);
+        }
+
+      else (Cancel)
+        partition "BudgetsController (UI)" {
+          :Close confirmation dialog\n(no changes);
+        }
+      endif
+
+    endif
+  }
+
+else (no)
+  partition "BudgetsController (UI)" {
+    :Show "Budget not found" message;
+    :Refresh budgets list (optional);
+  }
+endif
+
+stop
+@enduml

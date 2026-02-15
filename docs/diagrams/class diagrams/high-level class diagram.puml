@@ -1,0 +1,77 @@
+@startuml
+title SmartBudget - Overview UML (High-Level Architecture)
+
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam ranksep 20
+
+package "\nUI Layer (JavaFX Controllers)" as UI {
+  class TransactionsController
+  class BudgetsController
+  class ReportsController
+  class NavigationController
+  class StartupController
+}
+
+package "\nService Layer (Business Logic)" as SVC {
+  class TransactionService
+  class BudgetService
+  class ReportService
+  class AlertService
+}
+
+package "\nDomain Model" as DOMAIN {
+  class Transaction
+  class Budget
+}
+
+package "\nPersistence Layer" as PERSIST {
+  interface Storage
+  class JsonStorage
+}
+
+' -------------------------
+' UI -> Services (calls)
+' -------------------------
+
+TransactionsController ..> TransactionService : add/edit/delete/filter
+TransactionsController ..> AlertService : check overspending
+
+BudgetsController ..> BudgetService : set/update budgets
+BudgetsController ..> AlertService : check overspending
+
+ReportsController ..> ReportService : generate reports
+
+NavigationController ..> TransactionsController : navigate
+NavigationController ..> BudgetsController : navigate
+NavigationController ..> ReportsController : navigate
+
+StartupController ..> Storage : load transactions/budgets
+StartupController ..> NavigationController : start app
+
+' -------------------------
+' Service -> Service (indirect storage access)
+' -------------------------
+ReportService ..> TransactionService : read transactions
+AlertService ..> TransactionService : read spending
+AlertService ..> BudgetService : read budgets
+
+' -------------------------
+' Services -> Domain (uses)
+' -------------------------
+TransactionService ..> Transaction : CRUD operations
+BudgetService ..> Budget : manage limits
+ReportService ..> Transaction : summarize/breakdown
+AlertService ..> Budget : compare limits
+AlertService ..> Transaction : compute spending
+
+
+' -------------------------
+' Services -> Persistence
+' -------------------------
+TransactionService ..> Storage : load/save transactions
+BudgetService ..> Storage : load/save budgets
+
+JsonStorage ..|> Storage : implements
+
+@enduml

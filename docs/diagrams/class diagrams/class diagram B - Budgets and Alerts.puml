@@ -1,0 +1,168 @@
+@startuml
+title SmartBudget - Diagram B (Budgets + Alerts: FR3 / UC-4, UC-6)
+
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam linetype ortho
+skinparam ranksep 150
+
+package "UI Layer (Controller)" as UI {
+  class BudgetsController {
+    - budgetService : BudgetService
+    - alertService : AlertService
+    - transactionService : TransactionService
+    --
+    + initialize() : void
+    + onUpsertBudget(category: Category, limit: BigDecimal) : void
+    + onEditBudget(category: Category, newLimit: BigDecimal) : void
+    + refreshBudgetsView() : void
+    + showAlertIfNeeded(category: Category) : void
+  }
+}
+
+package "Service Layer (Business Logic)\n" as SVC {
+  class BudgetService {
+    - storage : Storage
+    - validator : Validator
+    - cache : List<Budget>
+    --
+    + loadOnStartup() : void
+    + getAllBudgets() : List<Budget>
+    + getBudgetsForMonth(month: YearMonth) : List<Budget>
+    + getBudget(category: Category, month: YearMonth) : Budget
+    + upsertBudget(budget: Budget) : Budget
+    + deleteBudget(category: Category, month: YearMonth) : void
+    + persist() : void
+  }
+
+  class AlertService {
+    - budgetService : BudgetService
+    - transactionService : TransactionService
+    --
+    + checkBudgetStatus(category: Category, month: YearMonth) : Optional<OverspendingAlert>
+    + checkAllBudgets(month: YearMonth) : List<OverspendingAlert>
+  }
+
+  class TransactionService {
+    - storage : Storage
+    --
+    + getAll() : List<Transaction>
+    + getExpensesForCategoryAndMonth(category: Category, month: YearMonth) : BigDecimal
+  }
+}
+
+package "Domain Model (Entities + Result)" as DOMAIN {
+
+  enum Category {
+    FOOD_AND_DINING
+    TRANSPORTATION
+    BILLS_AND_UTILITIES
+    SHOPPING
+    ENTERTAINMENT
+    HEALTHCARE
+    OTHER
+  }
+
+  enum TransactionType {
+    INCOME
+    EXPENSE
+  }
+
+  class Budget {
+    - category : Category
+    - month : YearMonth
+    - limit : BigDecimal
+    --
+    + Budget(category: Category, month: YearMonth, limit: BigDecimal)
+  }
+
+  class OverspendingAlert {
+    - category : Category
+    - month : YearMonth
+    - limit : BigDecimal
+    - spent : BigDecimal
+    - overBy : BigDecimal
+    - status : AlertStatus
+    --
+    + isTriggered() : boolean
+  }
+
+  enum AlertStatus {
+    OK
+    REACHED
+    EXCEEDED
+  }
+
+  ' Minimal transaction model (only what budgets/alerts need)
+  class Transaction {
+    - id : UUID
+    - type : TransactionType
+    - amount : BigDecimal
+    - date : LocalDate
+    - category : Category
+  }
+}
+
+package "Persistence Layer" as PERSIST {
+  interface Storage {
+    + loadBudgets() : List<Budget>
+    + saveBudgets(budgets: List<Budget>) : void
+    + loadTransactions() : List<Transaction>
+    + saveTransactions(txs: List<Transaction>) : void
+  }
+
+  class JsonStorage {
+    - budgetsPath : Path
+    - transactionsPath : Path
+    --
+    + JsonStorage(budgetsPath: Path, transactionsPath: Path)
+    + loadBudgets() : List<Budget>
+    + saveBudgets(budgets: List<Budget>) : void
+    + loadTransactions() : List<Transaction>
+    + saveTransactions(txs: List<Transaction>) : void
+  }
+}
+
+package "Shared Utility" as UTIL {
+  class Validator {
+    + validateBudget(budget: Budget) : void
+    + requireNotBlank(value: String, fieldName: String) : void
+    + requirePositive(amount: BigDecimal, fieldName: String) : void
+  }
+}
+
+' -------------------------
+' Relationships / Dependencies
+' -------------------------
+
+' Controller talks to services only (MVC)
+BudgetsController ..> BudgetService : calls
+BudgetsController ..> AlertService : requests alerts
+BudgetsController ..> TransactionService : refresh spending\n(for remaining)
+
+' Services and their responsibilities
+BudgetService o-- "0..*" Budget : cache
+BudgetService ..> Storage : load/save budgets
+BudgetService ..> Validator : validate inputs
+
+TransactionService ..> Storage : read transactions
+TransactionService ..> Transaction : returns/reads
+
+AlertService ..> BudgetService : reads budgets
+AlertService ..> TransactionService : reads spending
+AlertService ..> OverspendingAlert : creates/returns
+
+' Domain links
+OverspendingAlert --> AlertStatus : status
+
+' Added associations for clarity (requested)
+Transaction --> Category : category
+Transaction --> TransactionType : type
+Budget --> Category : category
+
+' Persistence implementation
+JsonStorage ..|> Storage : implements
+Storage ..> Budget : stores
+Storage ..> Transaction : reads
+
+@enduml

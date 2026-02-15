@@ -1,0 +1,111 @@
+@startuml
+title UC-5 View Summary Report (FR4) - Activity Diagram (Matches Final UI)
+
+skinparam style strictuml
+skinparam shadowing false
+skinparam linetype ortho
+skinparam activity {
+  BackgroundColor white
+  BorderColor black
+  ArrowColor black
+}
+
+start
+
+partition "User" {
+  :Navigate to "Reports" page;
+}
+
+partition "ReportsController (UI)" {
+  :initialize();
+  :Set default Period Type = THIS_MONTH;
+  :Set default Chart Type = PIE;
+  :range = PeriodRange.ofMonth(currentMonth);
+  :refreshReport(range);
+  :Call ReportService.generateReport(range);
+}
+
+partition "ReportService" {
+  :Request transactions in range;
+  :Call TransactionService.getByRange(range);
+}
+
+partition "TransactionService" {
+  if (Cache loaded?) then (yes)
+    :Use cached transactions;
+  else (no)
+    :loadOnStartup();
+    partition "Storage" {
+      :loadTransactions();
+    }
+    :Cache transactions in memory;
+  endif
+  :Filter transactions by range;
+  :Return list in range;
+}
+
+partition "ReportService" {
+  if (No transactions in range?) then (yes)
+    :Build ReportResult\n(hasData=false, message="No records found");
+  else (no)
+    :summary = getSummary(range)\n(income, expense, balance);
+    :breakdown = getSpendingByCategory(range);
+    :Build ReportResult\n(hasData=true, summary, breakdown);
+  endif
+  :Return ReportResult;
+}
+
+partition "ReportsController (UI)" {
+  if (hasData = false) then (yes)
+    :showNoDataState(message);
+    :Render cards with 0 values;
+    :Render empty "Spending by Category" state;
+  else (no)
+    :Render summary cards\n(Total Income, Total Expenses, Net Balance);
+    :Render "Spending by Category"\n(PIE chart by default);
+  endif
+}
+
+partition "User" {
+  :Select Period Type from dropdown\n(This Month / All Time / Custom Date Range)\n(optional);
+}
+
+partition "ReportsController (UI)" {
+  if (User changed Period Type?) then (yes)
+
+    if (Period Type = ALL_TIME) then (ALL_TIME)
+      :range = PeriodRange.allTime();
+    elseif (Period Type = THIS_MONTH) then (THIS_MONTH)
+      :range = PeriodRange.ofMonth(currentMonth);
+    else (CUSTOM_RANGE)
+      :Prompt for start/end dates;
+      partition "User" {
+        :Enter start date and end date;
+      }
+      :range = new PeriodRange(start, end);
+      if (range.isValid()?) then (yes)
+      else (no)
+        :Show inline date error;
+        stop
+      endif
+    endif
+
+    :refreshReport(range);
+    :Call ReportService.generateReport(range);
+    :Update cards + chart\n(or no-data state);
+  endif
+}
+
+partition "User" {
+  :Toggle chart type\n(Pie Chart / Bar Chart)\n(optional);
+}
+
+partition "ReportsController (UI)" {
+  if (Chart type changed?) then (yes)
+    :selectedChartType = newType;
+    :Re-render chart using existing breakdown\n(no recomputation);
+  endif
+}
+
+stop
+@enduml

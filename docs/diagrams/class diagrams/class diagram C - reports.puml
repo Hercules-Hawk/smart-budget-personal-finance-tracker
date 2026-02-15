@@ -1,0 +1,191 @@
+@startuml
+title SmartBudget - Diagram C (Reports: FR4 / UC-5)
+
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam linetype ortho
+skinparam ranksep 150
+
+top to bottom direction
+
+' =========================================================
+' UI Layer (TOP)
+' =========================================================
+package "UI Layer (Controller)" as UI {
+
+  class ReportsController {
+    - reportService : ReportService
+    - selectedPeriodType : ReportPeriodType
+    - selectedChartType : ChartType
+    --
+    + initialize() : void
+    + onPeriodTypeChanged(type: ReportPeriodType) : void
+    + onSelectThisMonth(month: YearMonth) : void
+    + onSelectAllTime() : void
+    + onSelectCustomRange(start: LocalDate, end: LocalDate) : void
+    + onChartTypeChanged(type: ChartType) : void
+    + refreshReport(range: PeriodRange) : void
+    + showNoDataState(message: String) : void
+  }
+}
+
+' =========================================================
+' Service Layer (MIDDLE)
+' =========================================================
+package "Service Layer (Business Logic for FR4)" as SVC {
+
+  class ReportService {
+    - transactionService : TransactionService
+    --
+    + generateReport(range: PeriodRange) : ReportResult
+    + getSummary(range: PeriodRange) : SummaryReport
+    + getSpendingByCategory(range: PeriodRange) : List<CategoryTotal>
+  }
+
+  class TransactionService {
+    - storage : Storage
+    - cache : List<Transaction>
+    --
+    + loadOnStartup() : void
+    + getAll() : List<Transaction>
+    + getByRange(range: PeriodRange) : List<Transaction>
+  }
+}
+
+' =========================================================
+' Domain Model (BOTTOM)
+' =========================================================
+package "\nDomain Model (Entities + Results)" as DOMAIN {
+
+  enum Category {
+    FOOD_AND_DINING
+    TRANSPORTATION
+    BILLS_AND_UTILITIES
+    SHOPPING
+    ENTERTAINMENT
+    HEALTHCARE
+    OTHER
+  }
+
+  enum TransactionType {
+    INCOME
+    EXPENSE
+  }
+
+  class Transaction {
+    - id : UUID
+    - type : TransactionType
+    - amount : BigDecimal
+    - date : LocalDate
+    - category : Category
+    - note : String
+  }
+
+  class PeriodRange {
+    - start : LocalDate
+    - end : LocalDate
+    --
+    + PeriodRange(start: LocalDate, end: LocalDate)
+    + isValid() : boolean
+    + ofMonth(month: YearMonth) : PeriodRange
+    + allTime() : PeriodRange
+  }
+
+  enum ReportPeriodType {
+    ALL_TIME
+    THIS_MONTH
+    CUSTOM_RANGE
+  }
+
+  enum ChartType {
+    PIE
+    BAR
+  }
+
+  class SummaryReport {
+    - totalIncome : BigDecimal
+    - totalExpense : BigDecimal
+    - balance : BigDecimal
+    --
+    + isEmpty() : boolean
+  }
+
+  class CategoryTotal {
+    - category : Category
+    - total : BigDecimal
+    - percentOfTotal : double
+  }
+
+  class ReportResult {
+    - range : PeriodRange
+    - summary : SummaryReport
+    - breakdown : List<CategoryTotal>
+    - hasData : boolean
+    - message : String
+  }
+
+  ' Minimal placeholder referenced by Storage (full details in Diagram B)
+  class Budget
+}
+
+' =========================================================
+' Persistence Layer (SIDE)
+' =========================================================
+package "Persistence Layer" as PERSIST {
+  interface Storage {
+    + loadTransactions() : List<Transaction>
+    + saveTransactions(txs: List<Transaction>) : void
+    + loadBudgets() : List<Budget>
+    + saveBudgets(budgets: List<Budget>) : void
+  }
+
+  class JsonStorage {
+    - transactionsPath : Path
+    - budgetsPath : Path
+    --
+    + loadTransactions() : List<Transaction>
+    + saveTransactions(txs: List<Transaction>) : void
+    + loadBudgets() : List<Budget>
+    + saveBudgets(budgets: List<Budget>) : void
+  }
+}
+
+' =========================================================
+' Layout helpers (hidden links to shape the diagram)
+' =========================================================
+UI -[hidden]down-> SVC
+SVC -[hidden]down-> DOMAIN
+SVC -[hidden]right-> PERSIST
+
+' =========================================================
+' Relationships / Dependencies (actual)
+' =========================================================
+
+' UI -> Service
+ReportsController ..> ReportService : requests report (FR4/UC-5)
+ReportsController ..> ReportPeriodType : uses
+ReportsController ..> ChartType : uses
+ReportsController ..> PeriodRange : builds range
+
+' Service -> Domain / DTOs
+ReportService ..> ReportResult : returns
+ReportService ..> SummaryReport : computes/returns
+ReportService ..> CategoryTotal : computes/returns
+ReportService ..> PeriodRange : uses
+
+' Service -> Service
+ReportService ..> TransactionService : reads transactions
+
+' Transaction access + persistence
+TransactionService o-- "0..*" Transaction : cache
+TransactionService ..> PeriodRange : filter by date range
+TransactionService ..> Storage : load/save
+JsonStorage ..|> Storage : implements
+Storage ..> Transaction : stores
+Storage ..> Budget : stores
+
+' Associations for clarity
+Transaction --> Category : category
+Transaction --> TransactionType : type
+
+@enduml

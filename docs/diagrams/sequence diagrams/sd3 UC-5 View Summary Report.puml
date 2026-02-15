@@ -1,0 +1,56 @@
+@startuml
+title UC-5 View Summary Report (FR4) - SD-3
+
+actor User
+participant "ReportsController" as RC
+participant "ReportService" as RS
+participant "TransactionService" as TS
+participant "Storage" as ST
+
+== User selects a reporting period (use one path only) ==
+User -> RC : onSelectCustomRange(start: LocalDate, end: LocalDate)
+activate RC
+
+RC -> RC : range = new PeriodRange(start, end)
+RC -> RC : refreshReport(range)
+
+== Controller requests report from ReportService ==
+RC -> RS : generateReport(range)
+activate RS
+
+== ReportService pulls transactions in range ==
+RS -> TS : getByRange(range)
+activate TS
+
+' Usually cache is already loaded on startup, but this keeps the flow realistic.
+opt cache not loaded yet
+  TS -> TS : loadOnStartup()
+  TS -> ST : loadTransactions()
+  ST --> TS : txList
+  TS -> TS : cache = txList
+end
+
+TS -> TS : filter cache by range
+TS --> RS : txInRange
+deactivate TS
+
+== ReportService computes FR4 outputs ==
+RS -> RS : summary = getSummary(range)
+RS -> RS : breakdown = getSpendingByCategory(range)
+
+alt no transactions in range
+  RS --> RC : ReportResult(hasData=false,\nmessage="No records found", range)
+  deactivate RS
+
+  RC -> RC : showNoDataState(message)
+  RC --> User : display zeros + "no records found"
+else has data
+  RS --> RC : ReportResult(hasData=true,\nsummary, breakdown, range)
+  deactivate RS
+
+  RC -> RC : render summary totals\n+ chart using selectedChartType
+  RC --> User : show totals + chart
+end
+
+deactivate RC
+@enduml

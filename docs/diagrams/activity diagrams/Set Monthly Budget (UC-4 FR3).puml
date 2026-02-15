@@ -1,0 +1,99 @@
+@startuml
+title UC-4 Set Monthly Budget (Create) - Activity Diagram (FR3)
+
+skinparam style strictuml
+skinparam shadowing false
+skinparam activity {
+  BackgroundColor white
+  BorderColor black
+  ArrowColor black
+}
+skinparam linetype ortho
+
+start
+
+partition "User" {
+  :Navigate to Budgets page;
+  :Click "Add Budget" button;
+}
+
+partition "BudgetsController (UI)" {
+  :Open "Create Budget" modal/lightbox;
+  :Render empty form fields\n(Category dropdown, Monthly Limit input);
+}
+
+' --- User can cancel/close before saving ---
+partition "User" {
+  if (Close modal without saving?) then (X / Cancel)
+    :Click "X" or "Cancel";
+    stop
+  else (Continue)
+    :Select Category;
+    :Enter Monthly Limit;
+    :Click "Create Budget";
+  endif
+}
+
+repeat
+  partition "BudgetsController (UI)" {
+    :Set month = YearMonth.now();
+    :Build Budget object\n(category, monthlyLimit, month);
+    :Call BudgetService.upsertBudget(budget);
+  }
+
+  partition "BudgetService" {
+    :Validate budget (via Validator);
+  }
+
+  partition "Validator" {
+    :validateBudget(budget)\n(category selected,\nlimit > 0, numeric);
+  }
+
+  partition "BudgetsController (UI)" {
+    if (Validation fails?) then (yes)
+      :Show inline validation errors\ninside modal;
+      partition "User" {
+        :Fix inputs;
+        :Click "Create Budget" again;
+      }
+    endif
+  }
+
+repeat while (Validation fails?) is (yes)
+
+partition "BudgetService" {
+  :Save/Update budget in cache;
+  :Persist budgets;
+}
+
+partition "Storage" {
+  :saveBudgets(cache);
+}
+
+' --- Check overspending after budget is set (UC-6 embedded) ---
+partition "BudgetsController (UI)" {
+  :Call AlertService.checkBudgetStatus(budget.category, month);
+}
+
+partition "AlertService" {
+  :Get current month spending\nfor budget.category;
+  if (Spending >= monthlyLimit?) then (yes)
+    :Prepare overspending warning\n(details for UI);
+  else (no)
+    :No warning needed;
+  endif
+}
+
+partition "BudgetsController (UI)" {
+  :Close "Create Budget" modal;
+  :Refresh budgets cards/list\n(spent, limit, progress bar);
+
+  if (Spending >= monthlyLimit?) then (yes)
+    :Display overspending warning\n(e.g., banner on card:\n"You've exceeded your limit");
+  endif
+
+  :Show success feedback (optional);
+}
+
+stop
+@enduml

@@ -1,0 +1,70 @@
+@startuml
+title UC-3 View & Filter Transactions - Activity Diagram (FR2)
+
+skinparam style strictuml
+skinparam shadowing false
+skinparam activity {
+  BackgroundColor white
+  BorderColor black
+  ArrowColor black
+}
+skinparam linetype ortho
+
+start
+
+partition "User" {
+  :Navigate to Transactions view;
+}
+
+partition "TransactionsController (UI)" {
+  :Initialize filter state\n(search="", category=All,\ntype=All, fromDate=null, toDate=null);
+  :Call TransactionService.getAll();
+}
+
+partition "TransactionService" {
+  :Return all transactions;
+}
+
+partition "TransactionsController (UI)" {
+  :Render filters bar;
+  :Render transactions table\n(with Edit/Delete actions);
+}
+
+' --- Reactive filtering (no Apply button) ---
+repeat
+  partition "User" {
+    :Adjust filters by:\n- typing in Search\n- selecting Category\n- selecting Type\n- entering From/To dates\nOR clicking "Clear Filters";
+  }
+
+  partition "TransactionsController (UI)" {
+    if (Clicked "Clear Filters"?) then (yes)
+      :Reset filter state to defaults;
+    else (no)
+      :Update filter state with latest input;
+    endif
+
+    if (Date range invalid?\n(fromDate > toDate)) then (yes)
+      :Show inline date error\n(or ignore invalid range);
+      :Keep previous valid date range;
+    endif
+
+    :Call TransactionService.filter(criteria);
+  }
+
+  partition "TransactionService" {
+    :Filter transactions using criteria:\n- keyword matches description\n- category match (if not All)\n- type match (if not All)\n- date within range (if provided);
+    :Return filtered list;
+  }
+
+  partition "TransactionsController (UI)" {
+    if (Filtered list empty?) then (yes)
+      :Render empty table state\n("No matching transactions");
+    else (no)
+      :Render filtered transactions table;
+    endif
+  }
+
+repeat while (User continues filtering?) is (yes)
+
+stop
+@enduml

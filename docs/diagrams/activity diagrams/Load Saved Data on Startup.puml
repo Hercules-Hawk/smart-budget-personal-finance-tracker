@@ -1,0 +1,72 @@
+@startuml
+title Load Saved Data on Startup (US-8) - Activity Diagram (FR1 + FR3) [Landing = Transactions Page]
+
+skinparam style strictuml
+skinparam shadowing false
+skinparam linetype ortho
+skinparam activity {
+  BackgroundColor white
+  BorderColor black
+  ArrowColor black
+}
+
+start
+
+partition "App / UI Shell" {
+  :Application launches;
+  :Initialize controllers & services;
+  :Set landing page = Transactions;
+}
+
+partition "StartupController" {
+  :loadSavedDataOnStartup();
+  :Call Storage.loadTransactions();
+}
+
+partition "Storage" {
+  :Read transactions from local storage;
+}
+
+partition "StartupController" {
+  if (Transactions data exists?) then (yes)
+    :Load transactions into in-memory cache;
+  else (no)
+    :Initialize empty transactions list in cache;
+  endif
+
+  :Call Storage.loadBudgets();
+}
+
+partition "Storage" {
+  :Read budgets from local storage;
+}
+
+partition "StartupController" {
+  if (Budgets data exists?) then (yes)
+    :Load budgets into in-memory cache;
+  else (no)
+    :Initialize empty budgets list in cache;
+  endif
+}
+
+partition "TransactionsController (UI)" {
+  :Render Transactions page layout;
+  :Render Filters bar\n(Search, Category=All, Type=All, Date Range empty);
+  :Request list for display\n(TransactionService.getAll());
+}
+
+partition "TransactionService" {
+  :Return cached transactions list;
+}
+
+partition "TransactionsController (UI)" {
+  if (Transactions list empty?) then (yes)
+    :Show empty table state\n(e.g., "No transactions yet");
+    :Keep "Add Transaction" button visible;
+  else (no)
+    :Render transactions table/list\n(with Edit/Delete actions);
+  endif
+}
+
+stop
+@enduml

@@ -1,0 +1,78 @@
+@startuml
+title SmartBudget - Layer Diagram
+
+skinparam componentStyle rectangle
+skinparam packageStyle rectangle
+skinparam linetype line
+skinparam ranksep 30
+
+package "\nUI Layer (View + Controller)" as UI {
+  [Views] as Views
+
+  [TransactionsController] as TxCtrl
+  [BudgetsController] as BudCtrl
+  [ReportsController] as RepCtrl
+  [NavigationController] as NavCtrl
+  [StartupController] as StartCtrl
+}
+
+package "\nApplication / Service Layer\n(Model - Business Logic)" as SVC {
+  [TransactionService] as TxSvc
+  [BudgetService] as BudSvc
+  [ReportService] as RepSvc
+  [AlertService] as AlertSvc
+}
+
+package "\nDomain Model\n(Model—Entities & Results)" as DOMAIN {
+  [Transaction] as Tx
+  [Budget] as Bud
+
+  '[Category <<enum>>] as Cat
+  '[TransactionType <<enum>>] as TxType
+
+  [Report] as Report
+  [OverspendingAlert] as Alert
+}
+
+package "\nPersistence Layer" as PERSIST {
+  interface "Storage" as Storage
+  [JsonStorage] as JsonStore
+}
+
+' --- UI depends on Services ---
+TxCtrl --> TxSvc : CRUD + filter
+TxCtrl --> AlertSvc : check overspending
+
+BudCtrl --> BudSvc : manage budgets
+BudCtrl --> AlertSvc : check overspending
+
+RepCtrl --> RepSvc : reports & charts
+
+NavCtrl --> TxCtrl : navigate
+NavCtrl --> BudCtrl : navigate
+NavCtrl --> RepCtrl : navigate
+
+StartCtrl --> Storage : load transactions/budgets
+StartCtrl --> NavCtrl : start app
+
+Views --> TxCtrl : events/bindings
+Views --> BudCtrl
+Views --> RepCtrl
+
+' --- Services depend on Domain ---
+TxSvc --> Tx : creates/returns
+BudSvc --> Bud : creates/returns
+RepSvc --> Report : returns
+AlertSvc --> Alert : returns
+
+' --- Service-to-service dependencies ---
+RepSvc --> TxSvc : read data
+AlertSvc --> BudSvc : read budgets
+AlertSvc --> TxSvc : read spending
+
+' --- Persistence ---
+TxSvc --> Storage : load/save
+BudSvc --> Storage : load/save
+Storage <|.. JsonStore : implements
+
+@enduml

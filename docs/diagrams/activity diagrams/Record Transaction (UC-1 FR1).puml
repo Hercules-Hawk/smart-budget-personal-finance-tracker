@@ -1,0 +1,93 @@
+@startuml
+title UC-1 Record Transaction (Add) - Activity Diagram (FR1)
+
+skinparam style strictuml
+skinparam shadowing false
+skinparam activity {
+  BackgroundColor white
+  BorderColor black
+  ArrowColor black
+}
+skinparam linetype ortho
+
+start
+
+partition "User" {
+  :Click "Add Transaction"\nbutton on Transactions page;
+}
+
+partition "TransactionsController (UI)" {
+  :Open Add Transaction modal/lightbox;
+  :Render empty form fields\n(Type, Amount, Category, Date, Description);
+}
+
+' --- User can cancel/close at any time before successful submit ---
+partition "User" {
+  if (Close modal without saving?) then (X / Cancel)
+    :Click "X" or "Cancel";
+    stop
+  else (Continue)
+    :Fill in fields;
+    :Click "Add Transaction"\n(submit button);
+  endif
+}
+
+repeat
+  partition "TransactionsController (UI)" {
+    :Build Transaction object\n(id, type, amount,\ncategory, date, description);
+    :Call TransactionService.add(tx);
+  }
+
+  partition "TransactionService" {
+    :Validate tx (via Validator);
+  }
+
+  partition "Validator" {
+    :validateTransaction(tx);
+  }
+
+  partition "TransactionsController (UI)" {
+    if (Validation fails?) then (yes)
+      :Show inline validation errors\ninside modal;
+      partition "User" {
+        :Fix inputs in modal;
+        :Click "Add Transaction"\n(submit again);
+      }
+    endif
+  }
+
+repeat while (Validation fails?) is (yes)
+
+partition "TransactionService" {
+  :Add tx to in-memory cache;
+  :Persist transactions;
+}
+
+partition "Storage" {
+  :saveTransactions(cache);
+}
+
+' --- UC-6 embedded: overspending alert after save (expense only) ---
+partition "TransactionsController (UI)" {
+  if (tx.isExpense()?) then (yes)
+    :Call AlertService.checkOverspendingFor(tx)\n-> alert (optional);
+
+    if (alert returned?) then (yes)
+      :Display overspending alert popup/banner;
+      partition "User" {
+        :Acknowledge / dismiss alert;
+      }
+    endif
+  else (no)
+    :Skip overspending check;
+  endif
+}
+
+partition "TransactionsController (UI)" {
+  :Close Add Transaction modal;
+  :Refresh transactions table/list;
+  :Show success feedback (optional);
+}
+
+stop
+@enduml
