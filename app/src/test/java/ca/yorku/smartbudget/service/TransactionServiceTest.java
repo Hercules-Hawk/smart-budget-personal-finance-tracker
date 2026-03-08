@@ -5,6 +5,8 @@ import ca.yorku.smartbudget.domain.PeriodRange;
 import ca.yorku.smartbudget.domain.Transaction;
 import ca.yorku.smartbudget.domain.TransactionFilter;
 import ca.yorku.smartbudget.domain.TransactionType;
+import ca.yorku.smartbudget.persistence.InMemoryStorage;
+import ca.yorku.smartbudget.persistence.Storage;
 import ca.yorku.smartbudget.util.ValidationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,7 +26,8 @@ class TransactionServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new TransactionService();
+        Storage storage = new InMemoryStorage();
+        service = new TransactionService(storage);
     }
 
     private Transaction expense(LocalDate date, Category category, String amount) {

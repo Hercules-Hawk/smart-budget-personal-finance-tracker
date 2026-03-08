@@ -53,6 +53,7 @@ Current tests cover:
 | **Domain** | `TransactionTest`, `TransactionFilterTest` | Constructors, getters, `isIncome`/`isExpense`, `isEmpty` and filter criteria. |
 | **Validation** | `ValidatorTest` | `validateTransaction` (required fields, amount &gt; 0, note length), `requireNotBlank`, `requirePositive`, `requireDate`. |
 | **Services** | `TransactionServiceTest`, `BudgetServiceTest` | Add/get/delete/update, filter, getByRange, getTotalsInRange, getExpensesForCategoryAndMonth; getAllBudgets, getBudgetsForMonth, getBudget, upsertBudget, deleteBudget, getExpensesForCategoryAndMonth. |
+| **Persistence** | `JsonStorageTest` | loadTransactions/loadBudgets return empty when file missing; save/load roundtrips for transactions and budgets; loadOnStartup restores data into services. |
 | **Sanity** | `SanityTest` | Ensures test suite runs. |
 
 **GUI:** The JavaFX UI (MainApp, RootView, controllers, modals) is not covered by automated tests. Manual testing is used for the UI. TestFX (or similar) for critical flows can be added later.
@@ -67,17 +68,16 @@ After running `./mvnw test` and opening `app/target/site/jacoco/index.html`:
 - **Gaps:**
   - **UI layer:** `ca.yorku.smartbudget.ui.RootView`, controllers, and modals are not exercised by unit tests. Manual testing is used for the GUI.
   - **ReportService / AlertService:** Can be covered by unit tests in a later cycle if desired.
-  - **Persistence:** Not implemented; when added, integration-style tests (e.g. JsonStorage with a temp directory) should be added.
+  - **Persistence:** JsonStorage is covered by `JsonStorageTest` (save/load roundtrips, loadOnStartup integration).
 
 ---
 
 ## 5. Issues and next steps
 
 - **No known failing tests.** Any new failure should be fixed before submission.
-- **Current status:** DS-20 (preliminary tests for Validator, domain types, and basic service behavior) is satisfied via `ValidatorTest`, `TransactionTest`, `TransactionFilterTest`, `TransactionServiceTest`, and `BudgetServiceTest`.
+- **Current status:** DS-20 (preliminary tests for Validator, domain types, and basic service behavior) is satisfied. DS-13/DS-14 (persistence) are tested via `JsonStorageTest` (save/load correctness, restart regression). Service tests use `InMemoryStorage`.
 - **Next development cycles (optional):**
   1. Add unit tests for `ReportService` and `AlertService` if desired.
-  2. Add integration-style tests for persistence when Storage/JsonStorage is implemented.
   3. Consider TestFX (or similar) for critical user flows (e.g. add transaction, switch tabs) once the UI is stable.
   4. Keep the JaCoCo report under `app/target/site/jacoco/` and refresh it with each `./mvnw test`; document any significant coverage drops in future deliverables.
 

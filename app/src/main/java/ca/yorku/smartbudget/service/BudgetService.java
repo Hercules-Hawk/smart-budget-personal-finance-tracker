@@ -2,6 +2,7 @@ package ca.yorku.smartbudget.service;
 
 import ca.yorku.smartbudget.domain.Budget;
 import ca.yorku.smartbudget.domain.Category;
+import ca.yorku.smartbudget.persistence.Storage;
 import ca.yorku.smartbudget.util.Validator;
 
 import java.math.BigDecimal;
@@ -12,9 +13,22 @@ import java.util.List;
 public class BudgetService {
     private final List<Budget> budgets = new ArrayList<>();
     private final TransactionService transactionService;
+    private final Storage storage;
 
-    public BudgetService(TransactionService transactionService) {
+    public BudgetService(TransactionService transactionService, Storage storage) {
         this.transactionService = transactionService;
+        this.storage = storage;
+    }
+
+    /** Load budgets from storage on startup. */
+    public void loadOnStartup() {
+        List<Budget> loaded = storage.loadBudgets();
+        budgets.clear();
+        budgets.addAll(loaded);
+    }
+
+    private void persist() {
+        storage.saveBudgets(getAllBudgets());
     }
 
     public List<Budget> getAllBudgets() {
@@ -48,6 +62,7 @@ public class BudgetService {
         Validator.validateBudget(budget);
         deleteBudget(budget.getCategory(), budget.getMonth());
         budgets.add(budget);
+        persist();
     }
 
     public void deleteBudget(Category category, YearMonth month) {
@@ -56,6 +71,7 @@ public class BudgetService {
             Budget b = budgets.get(i);
             if (b.getCategory() == category && b.getMonth().equals(month)) {
                 budgets.remove(i);
+                persist();
                 break;
             }
         }
