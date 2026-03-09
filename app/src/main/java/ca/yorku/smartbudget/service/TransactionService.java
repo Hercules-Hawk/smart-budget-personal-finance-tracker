@@ -4,6 +4,7 @@ import ca.yorku.smartbudget.domain.Category;
 import ca.yorku.smartbudget.domain.PeriodRange;
 import ca.yorku.smartbudget.domain.Transaction;
 import ca.yorku.smartbudget.domain.TransactionFilter;
+import ca.yorku.smartbudget.persistence.Storage;
 import ca.yorku.smartbudget.util.Validator;
 
 import java.math.BigDecimal;
@@ -17,6 +18,22 @@ import java.util.UUID;
 
 public class TransactionService {
     private final List<Transaction> transactions = new ArrayList<>();
+    private final Storage storage;
+
+    public TransactionService(Storage storage) {
+        this.storage = storage;
+    }
+
+    /** Load transactions from storage on startup. */
+    public void loadOnStartup() {
+        List<Transaction> loaded = storage.loadTransactions();
+        transactions.clear();
+        transactions.addAll(loaded);
+    }
+
+    private void persist() {
+        storage.saveTransactions(getAll());
+    }
 
     public List<Transaction> getAll() {
         List<Transaction> copy = new ArrayList<>();
@@ -36,6 +53,7 @@ public class TransactionService {
                 tx.getNote() != null ? tx.getNote() : ""
         );
         transactions.add(toAdd);
+        persist();
         return toAdd;
     }
 
@@ -44,6 +62,7 @@ public class TransactionService {
         if (tx.getId() == null) return;
         delete(tx.getId());
         transactions.add(tx);
+        persist();
     }
 
     public void delete(UUID id) {
@@ -51,6 +70,7 @@ public class TransactionService {
         for (int i = transactions.size() - 1; i >= 0; i--) {
             if (transactions.get(i).getId().equals(id)) {
                 transactions.remove(i);
+                persist();
                 break;
             }
         }
