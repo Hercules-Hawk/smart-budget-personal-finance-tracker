@@ -13,6 +13,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -56,20 +57,47 @@ public final class AddTransactionModal {
         titleRow.getChildren().add(closeBtn);
         titleRow.setAlignment(Pos.CENTER_LEFT);
 
-        // Type and Category use String ComboBox; we map selected index to enum (0 = Expense, 1 = Income; category index = Category.values()[index])
-        ComboBox<String> typeCombo = new ComboBox<>();
-        typeCombo.getItems().add("Expense");
-        typeCombo.getItems().add("Income");
-        typeCombo.getSelectionModel().select(0);
+        ComboBox<TransactionType> typeCombo = new ComboBox<>();
+        typeCombo.getItems().add(TransactionType.EXPENSE);
+        typeCombo.getItems().add(TransactionType.INCOME);
+        typeCombo.setCellFactory(list -> new ListCell<>() {
+            @Override
+            protected void updateItem(TransactionType item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? "" : TransactionCategoryOptions.displayType(item));
+            }
+        });
+        typeCombo.setButtonCell(new ListCell<>() {
+            @Override
+            protected void updateItem(TransactionType item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? "" : TransactionCategoryOptions.displayType(item));
+            }
+        });
+        typeCombo.getSelectionModel().select(TransactionType.EXPENSE);
 
         TextField amountField = new TextField("0.00");
         amountField.setPromptText("0.00");
 
-        ComboBox<String> categoryCombo = new ComboBox<>();
-        for (Category c : Category.values()) {
-            categoryCombo.getItems().add(c.getDisplayName());
-        }
+        ComboBox<Category> categoryCombo = new ComboBox<>();
+        categoryCombo.setCellFactory(list -> new ListCell<>() {
+            @Override
+            protected void updateItem(Category item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? "" : item.getDisplayName());
+            }
+        });
+        categoryCombo.setButtonCell(new ListCell<>() {
+            @Override
+            protected void updateItem(Category item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? "" : item.getDisplayName());
+            }
+        });
         categoryCombo.setPromptText("Select a category");
+        populateCategoryOptions(categoryCombo, typeCombo.getValue(), null);
+        typeCombo.valueProperty().addListener((obs, oldType, newType) ->
+                populateCategoryOptions(categoryCombo, newType, null));
 
         DatePicker datePicker = new DatePicker(LocalDate.now());
 
@@ -89,15 +117,12 @@ public final class AddTransactionModal {
         addBtn.setOnAction(e -> {
             errorLabel.setText("");
             try {
-                int typeIndex = typeCombo.getSelectionModel().getSelectedIndex();
-                if (typeIndex < 0) { errorLabel.setText("Please select a type."); return; }
-                // ComboBox order is Expense=0, Income=1; enum order is INCOME=0, EXPENSE=1 so we map explicitly
-                TransactionType type = (typeIndex == 0) ? TransactionType.EXPENSE : TransactionType.INCOME;
+                TransactionType type = typeCombo.getValue();
+                if (type == null) { errorLabel.setText("Please select a type."); return; }
                 BigDecimal amount = Validator.parseDecimal(amountField.getText());
                 if (amount == null) { errorLabel.setText("Enter a valid amount."); return; }
-                int catIndex = categoryCombo.getSelectionModel().getSelectedIndex();
-                if (catIndex < 0) { errorLabel.setText("Please select a category."); return; }
-                Category cat = Category.values()[catIndex];
+                Category cat = categoryCombo.getValue();
+                if (cat == null) { errorLabel.setText("Please select a category."); return; }
                 LocalDate date = datePicker.getValue();
                 if (date == null) { errorLabel.setText("Please select a date."); return; }
                 String note = descriptionField.getText() != null ? descriptionField.getText().trim() : "";
@@ -139,5 +164,14 @@ public final class AddTransactionModal {
         root.setPadding(new Insets(20));
         stage.setScene(new javafx.scene.Scene(root));
         stage.showAndWait();
+    }
+
+    private static void populateCategoryOptions(ComboBox<Category> categoryCombo, TransactionType type, Category preferred) {
+        categoryCombo.getItems().setAll(TransactionCategoryOptions.categoriesFor(type));
+        if (preferred != null && categoryCombo.getItems().contains(preferred)) {
+            categoryCombo.getSelectionModel().select(preferred);
+        } else {
+            categoryCombo.getSelectionModel().clearSelection();
+        }
     }
 }
